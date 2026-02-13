@@ -18,3 +18,5 @@
 # Env secrets
 .env
 .env.*.local
+
+commands.txt

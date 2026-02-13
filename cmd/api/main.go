@@ -1,40 +1,64 @@
 package main
 
 import (
-	"context"
-	"fmt"
+	"encoding/json"
 	"log"
-	"time"
+	"net/http"
+	"strings"
 
 	"github.com/joho/godotenv"
 
 	"warranty_days/internal/config"
 	"warranty_days/internal/db"
+	"warranty_days/internal/repo"
 )
 
 func main() {
-	_ = godotenv.Load() // в проде обычно не нужно, там env уже задан
+	_ = godotenv.Load()
 
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal("config error: ", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	pool, err := db.NewPool(ctx, cfg.DatabaseURL())
+	gormDB, err := db.NewGorm(cfg.DatabaseURL())
 	if err != nil {
-		log.Fatal("db connection error: ", err)
+		log.Fatal("gorm connect error: ", err)
 	}
-	defer pool.Close()
 
-	// тест: узнать текущую версию Postgres
-	var version string
-	if err := pool.QueryRow(context.Background(), "select version()").Scan(&version); err != nil {
-		log.Fatal("query error: ", err)
-	}
-	fmt.Println("Connected to Postgres:", version)
+	claimRepo := repo.NewClaimRepo(gormDB)
 
-	// На следующем этапе здесь будет запуск HTTP сервера.
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	})
+
+	mux.HandleFunc("/claims", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		vin := strings.TrimSpace(r.URL.Query().Get("vin"))
+		if vin == "" {
+			http.Error(w, "vin query param is required, example: /claims?vin=XXX", http.StatusBadRequest)
+			return
+		}
+
+		claims, err := claimRepo.ListByVINCaseInsensitive(r.Context(), vin)
+		if err != nil {
+			http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(claims)
+	})
+
+	log.Println("server on", cfg.HTTPAddr)
+	log.Fatal(http.ListenAndServe(cfg.HTTPAddr, mux))
 }
