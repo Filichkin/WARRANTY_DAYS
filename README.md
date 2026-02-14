@@ -1,12 +1,13 @@
 # WARRANTY_DAYS
 
-Сервис на Go для получения информации по VIN.
+Сервис на Go для работы с заявками по VIN и расчета дней ремонта в рамках текущего гарантийного года.
 
 ## Что делает проект
 
-- Отдает список обращений по VIN (регистронезависимый поиск).
-- Считает дни ремонта в пределах текущего гарантийного года для VIN.
-- Поднимает HTTP API и работает с PostgreSQL через GORM.
+- Возвращает список заявок по VIN (регистронезависимо).
+- Считает количество дней ремонта в рамках текущего гарантийного года.
+- Поддерживает JWT-аутентификацию (`register/login/refresh`).
+- Ограничивает доступ к бизнес-эндпоинтам только для авторизованных пользователей.
 
 ## Технологический стек
 
@@ -15,25 +16,29 @@
 - База данных: PostgreSQL
 - ORM: `gorm` + `gorm.io/driver/postgres`
 - Конфиг: переменные окружения (`.env`), загрузка через `godotenv`
-- Линтинг/форматирование: `golangci-lint` v2, `gofmt`, `goimports`
+- Логирование: `log/slog` (dev: text, prod: json)
+- JWT: `github.com/golang-jwt/jwt/v5`
 
 ## Структура проекта
 
-- `cmd/api/main.go` — точка входа, инициализация конфига, БД и HTTP роутера.
-- `internal/config` — загрузка и валидация конфигурации из env.
-- `internal/db` — подключение к PostgreSQL и настройки пула соединений.
-- `internal/models` — модели домена (`Claim`).
-- `internal/repo` — слой доступа к данным и бизнес-логика расчета дней ремонта.
-- `internal/httpapi/handler` — HTTP-обработчики.
-- `internal/httpapi/router` — маршрутизация и ограничение HTTP-методов.
-- `migrations` — SQL-миграции (создание таблицы `claims` и индексов).
-- `.golangci.yml` — конфигурация линтеров и форматтеров.
+- `cmd/api/main.go` — точка входа, DI и запуск HTTP-сервера.
+- `internal/config` — загрузка и валидация конфигурации.
+- `internal/db` — подключение и настройки пула БД.
+- `internal/models` — модели (`Claim`, `User`).
+- `internal/repo` — доступ к данным (`ClaimRepo`, `UserRepo`).
+- `internal/service` — бизнес-логика авторизации (`AuthService`).
+- `internal/auth` — генерация и валидация JWT.
+- `internal/httpapi/handler` — HTTP-хендлеры.
+- `internal/httpapi/middleware` — middleware (auth + request logging).
+- `internal/httpapi/router` — маршрутизация.
+- `migrations` — SQL-миграции.
 
 ## Конфигурация
 
 Используются переменные окружения:
 
 - `APP_ENV`
+- `LOG_LEVEL`
 - `HTTP_ADDR` (по умолчанию `:8080`)
 - `DB_HOST` (по умолчанию `127.0.0.1`)
 - `DB_PORT` (по умолчанию `5432`)
@@ -41,61 +46,151 @@
 - `DB_PASSWORD` (обязательный)
 - `DB_NAME` (обязательный)
 - `DB_SSLMODE` (по умолчанию `disable`)
-
-Пример есть в файле `.env`.
+- `JWT_SECRET` (обязательный, минимум 32 символа)
+- `JWT_ISSUER` (по умолчанию `warranty_days`)
+- `JWT_ACCESS_TTL` (по умолчанию `15m`)
+- `JWT_REFRESH_TTL` (по умолчанию `168h`)
 
 ## Запуск
 
 1. Поднять PostgreSQL и создать БД (например, `warranty_days`).
-2. Применить миграцию `migrations/001_create_claims.sql`.
-3. Заполнить переменные окружения (или `.env`).
+2. Применить миграции:
+
+```bash
+psql "postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=disable" -f migrations/001_create_claims.sql
+psql "postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=disable" -f migrations/002_create_users.sql
+```
+
+3. Заполнить `.env`.
 4. Запустить сервис:
 
 ```bash
 go run ./cmd/api
 ```
 
-Сервис стартует на адресе из `HTTP_ADDR` (по умолчанию `:8080`).
+## Auth (JWT)
 
-## API и задачи
+### Публичные эндпоинты
 
-### 1) Проверка доступности
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/refresh`
+- `GET /health`
+
+### Защищенные эндпоинты
+
+- `GET /claims?vin=...`
+- `GET /claims/warranty-year?vin=...`
+
+Для защищенных эндпоинтов нужен заголовок:
+
+```text
+Authorization: Bearer <access_token>
+```
+
+### Формат токенов
+
+`/auth/login` и `/auth/refresh` возвращают:
+
+```json
+{
+  "access_token": "...",
+  "refresh_token": "...",
+  "token_type": "Bearer"
+}
+```
+
+## API
+
+### Проверка доступности
 
 - `GET /health`
 - Ответ: `ok`
 
-### 2) Получить все обращения по VIN
+### Получить заявки по VIN
 
 - `GET /claims?vin=XXX`
-- Поиск VIN регистронезависимый (`LOWER(vin) = LOWER(?)`).
-- Ответ: JSON-массив записей `Claim`.
+- Ответ: JSON-массив `Claim`.
 
-### 3) Рассчитать дни ремонта в текущем гарантийном году
+### Рассчитать warranty-year repair days
 
 - `GET /claims/warranty-year?vin=XXX`
-- Логика:
-  - Берется самая ранняя `retail_date` по VIN.
-  - Рассчитывается окно текущего гарантийного года относительно текущей даты.
-  - Выбираются обращения, пересекающие это окно.
-  - Для каждого обращения считается пересечение по датам (включительно).
 - Ответ:
 
 ```json
 {
   "items": [
     {
-      "claim": { "id": 1, "vin": "XXX", "retail_date": "2024-01-10T00:00:00Z" },
-      "repair_days": 3
+      "claim": {
+        "id": 1,
+        "vin": "XXX",
+        "retail_date": "2024-01-10T00:00:00Z",
+        "ro_open_date": "2025-10-10T00:00:00Z",
+        "ro_close_date": "2025-10-25T00:00:00Z"
+      },
+      "repair_days": 11
     }
   ],
-  "total_days": 3
+  "total_days": 11
 }
 ```
 
-## Линтинг
+## Инструкция для Postman
 
-Проверка кода:
+1. Создай коллекцию и переменную `baseUrl = http://localhost:8080`.
+2. Выполни `POST {{baseUrl}}/auth/register`.
+
+Body (`raw`, `JSON`):
+
+```json
+{
+  "email": "test@example.com",
+  "password": "StrongPass123"
+}
+```
+
+Ожидаемо: `201 Created`.
+
+3. Выполни `POST {{baseUrl}}/auth/login`.
+
+Body:
+
+```json
+{
+  "email": "test@example.com",
+  "password": "StrongPass123"
+}
+```
+
+Ожидаемо: `200 OK` и токены.
+
+4. Сохрани `access_token` в переменную Postman `accessToken`, `refresh_token` в `refreshToken`.
+5. Для запроса `GET {{baseUrl}}/claims/warranty-year?vin=XWENE81BBM0000385` добавь Authorization:
+
+- Type: `Bearer Token`
+- Token: `{{accessToken}}`
+
+6. Проверка refresh: `POST {{baseUrl}}/auth/refresh`.
+
+Body:
+
+```json
+{
+  "refresh_token": "{{refreshToken}}"
+}
+```
+
+Ожидаемо: новая пара токенов.
+
+7. Негативные проверки:
+
+- Без токена на `/claims` -> `401`.
+- Неверный пароль на `/auth/login` -> `401`.
+- Повторная регистрация того же email -> `409`.
+
+## Линтинг и форматирование
 
 ```bash
+gofmt -w $(rg --files -g '*.go')
 golangci-lint run ./...
 ```
