@@ -2,19 +2,21 @@
 package router
 
 import (
+	"log/slog"
 	"net/http"
 
 	"warranty_days/internal/httpapi/handler"
+	"warranty_days/internal/httpapi/middleware"
 )
 
-func NewMux(claimsHandler *handler.ClaimsHandler) *http.ServeMux {
+func NewMux(claimsHandler *handler.ClaimsHandler, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", claimsHandler.Health)
 	mux.Handle("/claims", method(http.MethodGet, http.HandlerFunc(claimsHandler.GetClaimsByVIN)))
 	mux.Handle("/claims/warranty-year", method(http.MethodGet, http.HandlerFunc(claimsHandler.GetWarrantyYearClaims)))
 
-	return mux
+	return middleware.RequestLogging(logger, mux)
 }
 
 func method(allowed string, next http.Handler) http.Handler {

@@ -4,6 +4,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 
 type ClaimsHandler struct {
 	claimRepo *repo.ClaimRepo
+	logger    *slog.Logger
 }
 
 type warrantyYearResponse struct {
@@ -22,8 +24,11 @@ type warrantyYearResponse struct {
 	TotalDays int                        `json:"total_days"`
 }
 
-func NewClaimsHandler(claimRepo *repo.ClaimRepo) *ClaimsHandler {
-	return &ClaimsHandler{claimRepo: claimRepo}
+func NewClaimsHandler(claimRepo *repo.ClaimRepo, logger *slog.Logger) *ClaimsHandler {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &ClaimsHandler{claimRepo: claimRepo, logger: logger}
 }
 
 func (h *ClaimsHandler) Health(w http.ResponseWriter, _ *http.Request) {
@@ -33,12 +38,14 @@ func (h *ClaimsHandler) Health(w http.ResponseWriter, _ *http.Request) {
 func (h *ClaimsHandler) GetClaimsByVIN(w http.ResponseWriter, r *http.Request) {
 	vin := strings.TrimSpace(r.URL.Query().Get("vin"))
 	if vin == "" {
+		h.logger.WarnContext(r.Context(), "vin query param is missing", "path", r.URL.Path)
 		http.Error(w, "vin query param is required, example: /claims?vin=XXX", http.StatusBadRequest)
 		return
 	}
 
 	claims, err := h.claimRepo.ListByVINCaseInsensitive(r.Context(), vin)
 	if err != nil {
+		h.logger.ErrorContext(r.Context(), "failed to fetch claims by vin", "vin", vin, "error", err)
 		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -52,6 +59,7 @@ func (h *ClaimsHandler) GetClaimsByVIN(w http.ResponseWriter, r *http.Request) {
 func (h *ClaimsHandler) GetWarrantyYearClaims(w http.ResponseWriter, r *http.Request) {
 	vin := strings.TrimSpace(r.URL.Query().Get("vin"))
 	if vin == "" {
+		h.logger.WarnContext(r.Context(), "vin query param is missing", "path", r.URL.Path)
 		http.Error(w, "vin query param is required, example: /claims/warranty-year?vin=XXX", http.StatusBadRequest)
 		return
 	}
@@ -59,9 +67,11 @@ func (h *ClaimsHandler) GetWarrantyYearClaims(w http.ResponseWriter, r *http.Req
 	items, totalDays, err := h.claimRepo.ListWarrantyYearRepairsByVIN(r.Context(), vin, time.Now())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			h.logger.InfoContext(r.Context(), "claims not found for vin", "vin", vin)
 			http.Error(w, "claims not found for vin", http.StatusNotFound)
 			return
 		}
+		h.logger.ErrorContext(r.Context(), "failed to fetch warranty-year claims", "vin", vin, "error", err)
 		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

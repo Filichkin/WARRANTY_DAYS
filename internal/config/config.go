@@ -1,3 +1,4 @@
+// Package config
 package config
 
 import (
@@ -7,8 +8,9 @@ import (
 )
 
 type Config struct {
-	AppEnv      string
-	HTTPAddr    string
+	AppEnv     string
+	LogLevel   string
+	HTTPAddr   string
 	DBHost     string
 	DBPort     string
 	DBUser     string
@@ -19,15 +21,16 @@ type Config struct {
 
 func Load() (Config, error) {
 	cfg := Config{
-		AppEnv:      os.Getenv("APP_ENV"),
-		HTTPAddr:    os.Getenv("HTTP_ADDR"),
+		AppEnv:     os.Getenv("APP_ENV"),
+		LogLevel:   os.Getenv("LOG_LEVEL"),
+		HTTPAddr:   os.Getenv("HTTP_ADDR"),
 		DBHost:     os.Getenv("DB_HOST"),
 		DBPort:     os.Getenv("DB_PORT"),
 		DBUser:     os.Getenv("DB_USER"),
 		DBPassword: os.Getenv("DB_PASSWORD"),
 		DBName:     os.Getenv("DB_NAME"),
 		DBSSLMode:  os.Getenv("DB_SSLMODE"),
-		}
+	}
 	// дефолты
 	if cfg.HTTPAddr == "" {
 		cfg.HTTPAddr = ":8080"
