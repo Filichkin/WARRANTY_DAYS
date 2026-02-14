@@ -7,12 +7,14 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"warranty_days/internal/auth"
 	"warranty_days/internal/config"
 	"warranty_days/internal/db"
 	"warranty_days/internal/httpapi/handler"
 	"warranty_days/internal/httpapi/router"
 	"warranty_days/internal/logging"
 	"warranty_days/internal/repo"
+	"warranty_days/internal/service"
 )
 
 func main() {
@@ -36,9 +38,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Repositories
 	claimRepo := repo.NewClaimRepo(gormDB)
+	userRepo := repo.NewUserRepo(gormDB)
+
+	// Services
+	jwtSvc := auth.NewJWTService(
+		cfg.JWTSecret,
+		cfg.JWTIssuer,
+		cfg.JWTAccessTTL,
+		cfg.JWTRefreshTTL,
+	)
+	authSvc := service.NewAuthService(userRepo, jwtSvc)
+
+	// Handlers
 	claimsHandler := handler.NewClaimsHandler(claimRepo, logger)
-	mux := router.NewMux(claimsHandler, logger)
+	authHandler := handler.NewAuthHandler(authSvc)
+
+	// Router
+	mux := router.NewMux(claimsHandler, authHandler, jwtSvc, logger)
 
 	logger.Info("server starting", "http_addr", cfg.HTTPAddr)
 	if err := http.ListenAndServe(cfg.HTTPAddr, mux); err != nil {

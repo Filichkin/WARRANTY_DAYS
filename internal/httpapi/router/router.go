@@ -9,12 +9,29 @@ import (
 	"warranty_days/internal/httpapi/middleware"
 )
 
-func NewMux(claimsHandler *handler.ClaimsHandler, logger *slog.Logger) http.Handler {
+func NewMux(
+	claimsHandler *handler.ClaimsHandler,
+	authHandler *handler.AuthHandler,
+	jwtSvc middleware.AccessTokenValidator,
+	logger *slog.Logger,
+) http.Handler {
 	mux := http.NewServeMux()
 
+	// public routes
 	mux.HandleFunc("/health", claimsHandler.Health)
-	mux.Handle("/claims", method(http.MethodGet, http.HandlerFunc(claimsHandler.GetClaimsByVIN)))
-	mux.Handle("/claims/warranty-year", method(http.MethodGet, http.HandlerFunc(claimsHandler.GetWarrantyYearClaims)))
+	mux.Handle("/auth/register", method(http.MethodPost, http.HandlerFunc(authHandler.Register)))
+	mux.Handle("/auth/login", method(http.MethodPost, http.HandlerFunc(authHandler.Login)))
+	mux.Handle("/auth/refresh", method(http.MethodPost, http.HandlerFunc(authHandler.Refresh)))
+
+	// protected routes
+	mux.Handle(
+		"/claims",
+		middleware.Auth(jwtSvc, method(http.MethodGet, http.HandlerFunc(claimsHandler.GetClaimsByVIN))),
+	)
+	mux.Handle(
+		"/claims/warranty-year",
+		middleware.Auth(jwtSvc, method(http.MethodGet, http.HandlerFunc(claimsHandler.GetWarrantyYearClaims))),
+	)
 
 	return middleware.RequestLogging(logger, mux)
 }
