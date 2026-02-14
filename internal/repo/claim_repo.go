@@ -1,3 +1,4 @@
+// Package repo provides database repositories for claims and related entities
 package repo
 
 import (
@@ -6,8 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
 	"warranty_days/internal/models"
+
+	"gorm.io/gorm"
 )
 
 type ClaimRepo struct {
@@ -35,7 +37,11 @@ func (r *ClaimRepo) ListByVINCaseInsensitive(ctx context.Context, vin string) ([
 	return claims, err
 }
 
-func (r *ClaimRepo) ListWarrantyYearRepairsByVIN(ctx context.Context, vin string, now time.Time) ([]ClaimRepairDaysItem, int, error) {
+func (r *ClaimRepo) ListWarrantyYearRepairsByVIN(
+	ctx context.Context,
+	vin string,
+	now time.Time,
+) ([]ClaimRepairDaysItem, int, error) {
 	vin = strings.TrimSpace(vin)
 	if now.IsZero() {
 		now = time.Now()
