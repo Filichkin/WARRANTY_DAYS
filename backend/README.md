@@ -87,10 +87,11 @@ cd backend && air
 ```
 
 `air` использует конфиг из `.air.toml` и автоматически пересобирает/перезапускает сервер при изменении файлов.
+Текущий конфиг настроен на запуск `cmd/api` (реализация на `net/http`).
 
 ### Dev (без autoreload, через `go run`)
 
-Можно запускать и так:
+Можно запускать `net/http` реализацию:
 
 ```bash
 go run ./cmd/api
@@ -102,11 +103,23 @@ go run ./cmd/api
 go -C backend run ./cmd/api
 ```
 
+Можно запускать Gin реализацию:
+
+```bash
+go run ./cmd/api-gin
+```
+
+Запуск из корня монорепы:
+
+```bash
+go -C backend run ./cmd/api-gin
+```
+
 Важно: при изменениях в коде процесс не перезапускается автоматически, нужно остановить и запустить команду заново.
 
 ### Prod (без autoreload)
 
-Собрать и запустить бинарник:
+Собрать и запустить `net/http` бинарник:
 
 ```bash
 go build -o bin/api ./cmd/api
@@ -118,6 +131,13 @@ go build -o bin/api ./cmd/api
 ```bash
 go -C backend build -o bin/api ./cmd/api
 ./backend/bin/api
+```
+
+Собрать и запустить Gin бинарник:
+
+```bash
+go build -o bin/api-gin ./cmd/api-gin
+./bin/api-gin
 ```
 
 ## Auth (JWT)
