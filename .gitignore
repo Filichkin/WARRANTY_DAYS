@@ -9,6 +9,7 @@
 # Go build artifacts
 /bin/
 /dist/
+tmp/
 
 # Editor / OS
 .DS_Store
