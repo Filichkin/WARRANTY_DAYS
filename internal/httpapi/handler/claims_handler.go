@@ -20,8 +20,15 @@ type ClaimsHandler struct {
 }
 
 type warrantyYearResponse struct {
-	Items     []repo.ClaimRepairDaysItem `json:"items"`
-	TotalDays int                        `json:"total_days"`
+	Items          []repo.ClaimRepairDaysItem `json:"items"`
+	TotalDays      int                        `json:"total_days"`
+	RetailDate     time.Time                  `json:"retail_date"`
+	WarrantyPeriod warrantyPeriodResponse     `json:"warranty_period"`
+}
+
+type warrantyPeriodResponse struct {
+	Start time.Time `json:"start"`
+	End   time.Time `json:"end"`
 }
 
 func NewClaimsHandler(claimRepo *repo.ClaimRepo, logger *slog.Logger) *ClaimsHandler {
@@ -64,7 +71,11 @@ func (h *ClaimsHandler) GetWarrantyYearClaims(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	items, totalDays, err := h.claimRepo.ListWarrantyYearRepairsByVIN(r.Context(), vin, time.Now())
+	items, totalDays, retailDate, warrantyStart, warrantyEnd, err := h.claimRepo.ListWarrantyYearRepairsByVIN(
+		r.Context(),
+		vin,
+		time.Now(),
+	)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			h.logger.InfoContext(r.Context(), "claims not found for vin", "vin", vin)
@@ -77,8 +88,13 @@ func (h *ClaimsHandler) GetWarrantyYearClaims(w http.ResponseWriter, r *http.Req
 	}
 
 	resp := warrantyYearResponse{
-		Items:     items,
-		TotalDays: totalDays,
+		Items:      items,
+		TotalDays:  totalDays,
+		RetailDate: retailDate,
+		WarrantyPeriod: warrantyPeriodResponse{
+			Start: warrantyStart,
+			End:   warrantyEnd,
+		},
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

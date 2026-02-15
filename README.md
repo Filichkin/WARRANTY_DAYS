@@ -162,6 +162,11 @@ Authorization: Bearer <access_token>
       "repair_days": 11
     }
   ],
+  "retail_date": "2024-01-10T00:00:00Z",
+  "warranty_period": {
+    "start": "2025-01-10T00:00:00Z",
+    "end": "2026-01-09T00:00:00Z"
+  },
   "total_days": 11
 }
 ```

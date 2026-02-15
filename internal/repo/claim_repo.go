@@ -41,7 +41,7 @@ func (r *ClaimRepo) ListWarrantyYearRepairsByVIN(
 	ctx context.Context,
 	vin string,
 	now time.Time,
-) ([]ClaimRepairDaysItem, int, error) {
+) ([]ClaimRepairDaysItem, int, time.Time, time.Time, time.Time, error) {
 	vin = strings.TrimSpace(vin)
 	if now.IsZero() {
 		now = time.Now()
@@ -59,9 +59,9 @@ func (r *ClaimRepo) ListWarrantyYearRepairsByVIN(
 		Take(&retailHolder).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, 0, err
+			return nil, 0, time.Time{}, time.Time{}, time.Time{}, err
 		}
-		return nil, 0, err
+		return nil, 0, time.Time{}, time.Time{}, time.Time{}, err
 	}
 
 	warrantyStart, warrantyEnd := currentWarrantyYearWindow(retailHolder.RetailDate, now)
@@ -73,7 +73,7 @@ func (r *ClaimRepo) ListWarrantyYearRepairsByVIN(
 		Order("ro_open_date ASC, id ASC").
 		Find(&claims).Error
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, time.Time{}, time.Time{}, time.Time{}, err
 	}
 
 	items := make([]ClaimRepairDaysItem, 0, len(claims))
@@ -94,7 +94,7 @@ func (r *ClaimRepo) ListWarrantyYearRepairsByVIN(
 		totalDays += repairDays
 	}
 
-	return items, totalDays, nil
+	return items, totalDays, retailHolder.RetailDate, warrantyStart, warrantyEnd, nil
 }
 
 func currentWarrantyYearWindow(retailDate time.Time, now time.Time) (time.Time, time.Time) {
