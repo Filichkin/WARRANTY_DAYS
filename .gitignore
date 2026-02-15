@@ -10,6 +10,9 @@
 /bin/
 /dist/
 tmp/
+/backend/bin/
+/backend/api
+/backend/api-gin
 
 # Editor / OS
 .DS_Store
