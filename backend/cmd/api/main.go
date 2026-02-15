@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load()
+	loadDotEnv(".env", "../.env", "../../.env")
 
 	bootstrapLogger := logging.New(os.Getenv("APP_ENV"), os.Getenv("LOG_LEVEL"), os.Stdout)
 	slog.SetDefault(bootstrapLogger)
@@ -62,5 +62,13 @@ func main() {
 	if err := http.ListenAndServe(cfg.HTTPAddr, mux); err != nil {
 		logger.Error("http server stopped", "error", err)
 		os.Exit(1)
+	}
+}
+
+func loadDotEnv(paths ...string) {
+	for _, path := range paths {
+		if err := godotenv.Load(path); err == nil {
+			return
+		}
 	}
 }
