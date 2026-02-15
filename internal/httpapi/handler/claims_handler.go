@@ -20,15 +20,31 @@ type ClaimsHandler struct {
 }
 
 type warrantyYearResponse struct {
-	Items          []repo.ClaimRepairDaysItem `json:"items"`
-	TotalDays      int                        `json:"total_days"`
-	RetailDate     time.Time                  `json:"retail_date"`
-	WarrantyPeriod warrantyPeriodResponse     `json:"warranty_period"`
+	VIN        string                       `json:"vin"`
+	RetailDate time.Time                    `json:"retail_date"`
+	Periods    []warrantyYearPeriodResponse `json:"periods"`
+}
+
+type warrantyYearPeriodResponse struct {
+	WarrantyPeriod warrantyPeriodResponse `json:"warranty_period"`
+	TotalDays      int                    `json:"total_days"`
+	Items          []warrantyPeriodItem   `json:"items"`
 }
 
 type warrantyPeriodResponse struct {
 	Start time.Time `json:"start"`
 	End   time.Time `json:"end"`
+}
+
+type warrantyPeriodItem struct {
+	Claim      warrantyPeriodClaim `json:"claim"`
+	RepairDays int                 `json:"repair_days"`
+}
+
+type warrantyPeriodClaim struct {
+	ID          int64     `json:"id"`
+	RoOpenDate  time.Time `json:"ro_open_date"`
+	RoCloseDate time.Time `json:"ro_close_date"`
 }
 
 func NewClaimsHandler(claimRepo *repo.ClaimRepo, logger *slog.Logger) *ClaimsHandler {
@@ -71,7 +87,7 @@ func (h *ClaimsHandler) GetWarrantyYearClaims(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	items, totalDays, retailDate, warrantyStart, warrantyEnd, err := h.claimRepo.ListWarrantyYearRepairsByVIN(
+	repoResp, err := h.claimRepo.ListWarrantyYearRepairsByVIN(
 		r.Context(),
 		vin,
 		time.Now(),
@@ -87,14 +103,34 @@ func (h *ClaimsHandler) GetWarrantyYearClaims(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	periods := make([]warrantyYearPeriodResponse, 0, len(repoResp.Periods))
+	for _, period := range repoResp.Periods {
+		items := make([]warrantyPeriodItem, 0, len(period.Items))
+		for _, item := range period.Items {
+			items = append(items, warrantyPeriodItem{
+				Claim: warrantyPeriodClaim{
+					ID:          item.Claim.ID,
+					RoOpenDate:  item.Claim.RoOpenDate,
+					RoCloseDate: item.Claim.RoCloseDate,
+				},
+				RepairDays: item.RepairDays,
+			})
+		}
+
+		periods = append(periods, warrantyYearPeriodResponse{
+			WarrantyPeriod: warrantyPeriodResponse{
+				Start: period.WarrantyStart,
+				End:   period.WarrantyEnd,
+			},
+			TotalDays: period.TotalDays,
+			Items:     items,
+		})
+	}
+
 	resp := warrantyYearResponse{
-		Items:      items,
-		TotalDays:  totalDays,
-		RetailDate: retailDate,
-		WarrantyPeriod: warrantyPeriodResponse{
-			Start: warrantyStart,
-			End:   warrantyEnd,
-		},
+		VIN:        repoResp.VIN,
+		RetailDate: repoResp.RetailDate,
+		Periods:    periods,
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

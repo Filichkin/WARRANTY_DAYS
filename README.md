@@ -150,24 +150,35 @@ Authorization: Bearer <access_token>
 
 ```json
 {
-  "items": [
+  "vin": "XWENE81BBM0000385",
+  "retail_date": "2021-04-22T00:00:00Z",
+  "periods": [
     {
-      "claim": {
-        "id": 1,
-        "vin": "XXX",
-        "retail_date": "2024-01-10T00:00:00Z",
-        "ro_open_date": "2025-10-10T00:00:00Z",
-        "ro_close_date": "2025-10-25T00:00:00Z"
+      "warranty_period": {
+        "start": "2025-04-22T00:00:00Z",
+        "end": "2026-04-21T00:00:00Z"
       },
-      "repair_days": 11
+      "total_days": 5,
+      "items": [
+        {
+          "claim": {
+            "id": 79981,
+            "ro_open_date": "2025-05-24T00:00:00Z",
+            "ro_close_date": "2025-05-24T00:00:00Z"
+          },
+          "repair_days": 1
+        }
+      ]
+    },
+    {
+      "warranty_period": {
+        "start": "2024-04-22T00:00:00Z",
+        "end": "2025-04-21T00:00:00Z"
+      },
+      "total_days": 0,
+      "items": []
     }
-  ],
-  "retail_date": "2024-01-10T00:00:00Z",
-  "warranty_period": {
-    "start": "2025-01-10T00:00:00Z",
-    "end": "2026-01-09T00:00:00Z"
-  },
-  "total_days": 11
+  ]
 }
 ```
 
