@@ -62,10 +62,41 @@ psql "postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=disable" -f migrations/0
 ```
 
 3. Заполнить `.env`.
-4. Запустить сервис:
+
+### Dev (с autoreload)
+
+1. Установить `air`:
+
+```bash
+go install github.com/air-verse/air@latest
+```
+
+2. Убедиться, что `$(go env GOPATH)/bin` есть в `PATH` (если `air` не находится).
+3. Запускать сервис:
+
+```bash
+air
+```
+
+`air` использует конфиг из `.air.toml` и автоматически пересобирает/перезапускает сервер при изменении файлов.
+
+### Dev (без autoreload, через `go run`)
+
+Можно запускать и так:
 
 ```bash
 go run ./cmd/api
+```
+
+Важно: при изменениях в коде процесс не перезапускается автоматически, нужно остановить и запустить команду заново.
+
+### Prod (без autoreload)
+
+Собрать и запустить бинарник:
+
+```bash
+go build -o bin/api ./cmd/api
+./bin/api
 ```
 
 ## Auth (JWT)
