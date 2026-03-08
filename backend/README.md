@@ -73,7 +73,13 @@ psql "postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=disable" -f migrations/0
 go install github.com/air-verse/air@latest
 ```
 
-2. Убедиться, что `$(go env GOPATH)/bin` есть в `PATH` (если `air` не находится).
+2. Убедиться, что `~/go/bin` есть в `PATH`. Если `air` не находится (`zsh: command not found: air`), добавить в `~/.zshrc`:
+
+```bash
+export PATH="$PATH:$HOME/go/bin"
+```
+
+Затем перезагрузить профиль: `source ~/.zshrc`.
 3. Запускать сервис:
 
 ```bash
